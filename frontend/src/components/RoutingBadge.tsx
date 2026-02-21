@@ -1,0 +1,1 @@
+// RoutingBadge.tsx
