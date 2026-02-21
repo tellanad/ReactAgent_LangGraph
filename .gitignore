@@ -1,1 +1,40 @@
+# ── Python ───────────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# ── Node / NestJS ───────────────────────────────────
+node_modules/
+dist/
+.nest/
+
+# ── Environment files ───────────────────────────────
 .env
+.env.local
+.env.production
+
+# ── IDE ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# ── uv ──────────────────────────────────────────────
+.python-version
+uv.lock
+
+# ── Docker ──────────────────────────────────────────
+*.log
+docker-compose.override.yml
+
+# ── Testing / Coverage ──────────────────────────────
+.coverage
+htmlcov/
+.pytest_cache/
+coverage/
