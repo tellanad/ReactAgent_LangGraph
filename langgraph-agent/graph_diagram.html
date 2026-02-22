@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Enterprise Ops Copilot — LangGraph Flow</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle { color: #94a3b8; margin-bottom: 2rem; font-size: 0.95rem; }
+    .mermaid { background: #1e293b; border-radius: 12px; padding: 2rem; width: 100%; max-width: 1100px; }
+    .legend {
+      display: flex; gap: 1.5rem; margin-top: 1.5rem; flex-wrap: wrap; justify-content: center;
+    }
+    .legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: #94a3b8; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+    .info {
+      margin-top: 2rem; max-width: 800px; background: #1e293b;
+      border-radius: 12px; padding: 1.5rem; color: #cbd5e1; font-size: 0.9rem; line-height: 1.6;
+    }
+    .info h3 { color: #f8fafc; margin-bottom: 0.5rem; }
+    .info code { background: #334155; padding: 2px 6px; border-radius: 4px; color: #a5f3fc; font-size: 0.85rem; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+</head>
+<body>
+  <h1>Enterprise Ops Copilot</h1>
+  <p class="subtitle">ReAct Agent — LangGraph StateGraph Flow</p>
+
+  <div class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#4f46e5', 'primaryTextColor': '#fff', 'primaryBorderColor': '#6366f1', 'lineColor': '#94a3b8', 'secondaryColor': '#1e293b', 'tertiaryColor': '#0f172a'}}}%%
+graph TD
+    START((START)) --> ingest_user
+
+    ingest_user["ingest_user\nInitialize state defaults"]
+    route_intent["route_intent\nTier 0 · gpt-4o-mini\nClassify intent + select tools"]
+    budget_guard{"budget_guard\nCheck remaining budget"}
+    skill_router{"skill_router\nRoute by intent"}
+
+    ingest_user --> route_intent
+    route_intent --> budget_guard
+
+    budget_guard -->|"blocked\n(budget exhausted)"| final_response
+    budget_guard -->|"continue\n(budget OK)"| skill_router
+
+    skill_router -->|"qa / multi_step"| retrieve_for_qa
+    retrieve_for_qa["retrieve\nsearch_docs + salesforce\nVector + keyword search"]
+    answer_with_citations["answer_with_citations\nTier 1 · gpt-4o\nGrounded Q&A + citations"]
+    retrieve_for_qa --> answer_with_citations
+    answer_with_citations --> final_response
+
+    skill_router -->|"compliance"| retrieve_for_compliance
+    retrieve_for_compliance["retrieve\nsearch_docs (policy docs)"]
+    compliance_check["compliance_check\nTier 2 · gpt-4o (strong)\nRisk assessment + escalation"]
+    retrieve_for_compliance --> compliance_check
+    compliance_check --> final_response
+
+    skill_router -->|"action"| execute_action
+    execute_action["execute_action\nTier 0 · gpt-4o-mini\nJira / Calculator / CPQ"]
+    execute_action --> final_response
+
+    skill_router -->|"summarize"| summarize
+    summarize["summarize\nTier 0 · gpt-4o-mini\nToken-limited summary"]
+    summarize --> final_response
+
+    final_response["final_response\nPackage answer + citations"]
+    final_response --> END((END))
+
+    classDef startEnd fill:#059669,stroke:#10b981,color:#fff,stroke-width:2px
+    classDef tier0 fill:#0284c7,stroke:#38bdf8,color:#fff,stroke-width:2px
+    classDef tier1 fill:#7c3aed,stroke:#a78bfa,color:#fff,stroke-width:2px
+    classDef tier2 fill:#dc2626,stroke:#f87171,color:#fff,stroke-width:2px
+    classDef guard fill:#d97706,stroke:#fbbf24,color:#fff,stroke-width:2px
+    classDef neutral fill:#334155,stroke:#64748b,color:#f8fafc,stroke-width:2px
+
+    class START,END startEnd
+    class ingest_user,final_response neutral
+    class route_intent,execute_action,summarize tier0
+    class retrieve_for_qa,answer_with_citations,retrieve_for_compliance tier1
+    class compliance_check tier2
+    class budget_guard,skill_router guard
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#059669"></div> Start / End</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#0284c7"></div> Tier 0 — gpt-4o-mini (cheap)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#7c3aed"></div> Tier 1 — gpt-4o (mid)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#dc2626"></div> Tier 2 — gpt-4o (strong)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#d97706"></div> Guards / Routing</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#334155"></div> Utility nodes</div>
+  </div>
+
+  <div class="info">
+    <h3>Example Flows</h3>
+    <p>
+      <code>"What is the refund policy?"</code> → route_intent (qa) → retrieve → answer_with_citations → final<br><br>
+      <code>"Calculate 25000 * 0.85"</code> → route_intent (action) → execute_action (calculator) → final<br><br>
+      <code>"Is this HIPAA compliant?"</code> → route_intent (compliance) → retrieve → compliance_check (Tier 2) → final<br><br>
+      <code>"Summarize case CASE-001"</code> → route_intent (summarize) → summarize → final<br><br>
+      <code>"Create a Jira ticket"</code> → route_intent (action) → execute_action (jira) → final
+    </p>
+  </div>
+
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'dark' });</script>
+</body>
+</html>
