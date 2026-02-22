@@ -8,3 +8,9 @@ python-dotenv
 httpx
 pydantic
 colorama
+pinecone-client
+langchain-pinecone
+langchain-openai
+simple-salesforce
+jira
+slack-sdk

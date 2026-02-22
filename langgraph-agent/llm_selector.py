@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any
 from config import (
     MOCK_LLM,
-    TIER_MODELS,          # <-- fixed from TIER_MODES
+    TIER_MODELS,
     TIER_TEMPERATURES,
     TIER_MAX_TOKENS,
     COST_PER_1K,
@@ -15,12 +15,19 @@ from config import (
 
 
 def get_llm(tier: int = 0):
+    """Factory: returns an LLM instance based on tier.
+    
+    Tier 0: cheap  — routing, extraction, summarization
+    Tier 1: mid    — grounded Q&A with citations
+    Tier 2: strong — compliance, multi-hop reasoning
+    """
     if tier not in TIER_MODELS:
         raise ValueError(f"Invalid tier: {tier}. Must be 0, 1, or 2.")
-    if MOCK_LLM:
-        return MockLLM(tier=tier)   # <-- fixed: MockLLM class, not MOCK_LLM boolean
 
-    from langchain_openai import ChatOpenAI   # <-- fixed: lazy import
+    if MOCK_LLM:
+        return MockLLM(tier=tier)
+
+    from langchain_openai import ChatOpenAI
 
     return ChatOpenAI(
         model=TIER_MODELS[tier],
@@ -30,18 +37,14 @@ def get_llm(tier: int = 0):
 
 
 def estimate_cost(tier: int, input_tokens: int, output_tokens: int) -> float:
+    """Estimate USD cost for a given tier and token counts."""
     model = TIER_MODELS[tier]
     rates = COST_PER_1K.get(model, {"input": 0, "output": 0})
     cost = (input_tokens / 1000) * rates["input"] + (output_tokens / 1000) * rates["output"]
     return round(cost, 6)
 
 
-class MockLLM:
-    """Fake LLM for testing without API keys."""
-
-    def __init__(self, tier: int = 0):
-        self.tier = tier
-        self.model = TIER_MODELS[tier]       # <-- fixed
+# ── Mock LLM (used when MOCK_LLM=true) ──────────────────────────
 
 class MockLLM:
     """Fake LLM for testing without API keys."""
@@ -66,14 +69,13 @@ class MockLLM:
         return self
 
     def _generate_response(self, last_msg) -> str:
-    # Extract text from message
+        """Generate a mock response based on tier and message content."""
         text = ""
         if last_msg:
             text = last_msg.content if hasattr(last_msg, "content") else str(last_msg)
         text_lower = text.lower()
 
         if self.tier == 0:
-            # Smart routing based on keywords
             if any(w in text_lower for w in ["calculate", "+", "-", "*", "/", "how much"]):
                 return '{"intent": "action", "required_tools": ["calculator"], "llm_tier": 0, "risk_level": "low", "reasoning": "Math calculation requested"}'
             elif any(w in text_lower for w in ["ticket", "jira", "create", "open"]):

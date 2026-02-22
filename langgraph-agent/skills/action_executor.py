@@ -53,6 +53,9 @@ def execute_action(state: AgentState) -> dict:
     params = plan.get("params", {})
     user_message = plan.get("user_message", "")
 
+    # Adapt params to match tool's expected input
+    params = _adapt_params(tool_name, params, question)
+
     # Execute the tool
     action_result = {}
     if tool_name in TOOL_MAP:
@@ -71,7 +74,8 @@ def execute_action(state: AgentState) -> dict:
         final_answer = _format_action_result(tool_name, action_result, user_message)
 
     # Cost tracking
-    usage = getattr(response, "usage_metadata", {})
+    # Calculate cost for this step
+    usage = getattr(response, "usage_metadata", None) or {}
     input_tokens = usage.get("input_tokens", 50)
     output_tokens = usage.get("output_tokens", 30)
     step_cost = estimate_cost(0, input_tokens, output_tokens)
@@ -125,6 +129,43 @@ def _fallback_parse(question: str, tools: list[str]) -> dict:
         }
 
     return {"tool": tools[0] if tools else "", "params": {}, "user_message": "Attempting action."}
+
+
+def _adapt_params(tool_name: str, params: dict, question: str) -> dict:
+    """Adapt LLM-generated params to match tool's expected input schema.
+
+    Real LLMs sometimes return structured params (e.g. {"operation": "multiply", "operands": [25000, 0.85]})
+    instead of what the tool expects (e.g. {"expression": "25000 * 0.85"}).
+    """
+    if tool_name == "calculator":
+        # If LLM returned structured math instead of expression string
+        if "expression" not in params:
+            operation = params.get("operation", "")
+            operands = params.get("operands", [])
+            ops_map = {"multiply": "*", "add": "+", "subtract": "-", "divide": "/"}
+            if operation in ops_map and len(operands) >= 2:
+                expr = f" {ops_map[operation]} ".join(str(o) for o in operands)
+                return {"expression": expr}
+            # Last resort: extract math from the original question
+            import re
+            expr = re.sub(r'[a-zA-Z]', '', question).strip()
+            return {"expression": expr}
+
+    if tool_name == "create_jira_ticket":
+        # Ensure required fields exist
+        if "summary" not in params:
+            params["summary"] = params.get("title", question[:100])
+        if "description" not in params:
+            params["description"] = params.get("body", question)
+        if "priority" not in params:
+            params["priority"] = params.get("priority", "Medium")
+
+    if tool_name == "cpq_rules_lookup":
+        # Ensure product field exists
+        if "product" not in params:
+            params["product"] = params.get("product_name", params.get("name", "enterprise suite"))
+
+    return params
 
 
 def _format_action_result(tool_name: str, result: dict, user_message: str) -> str:

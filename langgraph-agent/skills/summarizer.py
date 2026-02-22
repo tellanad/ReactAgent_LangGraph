@@ -46,9 +46,10 @@ def summarize(state: AgentState) -> dict:
     ])
 
     # Cost
-    usage = getattr(response, "usage_metadata", {})
-    input_tokens = usage.get("input_tokens", 80)
-    output_tokens = usage.get("output_tokens", 50)
+    # Calculate cost for this step
+    usage = getattr(response, "usage_metadata", None) or {}
+    input_tokens = usage.get("input_tokens", 50)
+    output_tokens = usage.get("output_tokens", 30)
     step_cost = estimate_cost(0, input_tokens, output_tokens)
 
     trace_entry = {
